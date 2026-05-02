@@ -1,33 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
-    <title>لعبة القفز</title>
+    <meta charset="UTF-8">
+    <title>لعبة التحدي - GitHub</title>
     <style>
-        body { text-align: center; background: #222; color: white; }
-        canvas { background: #fff; display: block; margin: 20px auto; border: 4px solid #555; }
+        body { text-align: center; background-color: #1a1a1a; color: white; font-family: Arial; margin: 0; overflow: hidden; }
+        canvas { background: #fff; border: 4px solid #333; margin-top: 20px; cursor: pointer; }
+        .info { font-size: 20px; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <h1>لعبتي على GitHub</h1>
-    <p>اضغط المسافة (Space) للقفز</p>
-    <canvas id="game" width="400" height="200"></canvas>
+    <div class="info">النقاط: <span id="score">0</span> | اضغط Space للقفز</div>
+    <canvas id="gameCanvas" width="800" height="200"></canvas>
+
     <script>
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        let player = { x: 50, y: 150, w: 30, h: 30, dy: 0, jump: -8, grav: 0.5 };
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+
+        let score = 0;
+        let gameActive = true;
+
+        // إعدادات اللاعب
+        let player = { x: 50, y: 150, w: 40, h: 40, dy: 0, jump: -10, grav: 0.6, grounded: true };
+
+        // إعدادات العقبات
+        let obstacles = [];
+        let frame = 0;
+
+        function createObstacle() {
+            if (frame % 100 === 0) { // إنشاء عقبة كل 100 إطار
+                obstacles.push({ x: canvas.width, y: 160, w: 20, h: 40 });
+            }
+        }
 
         function update() {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            frame++;
+
+            // حركة الجاذبية للاعب
             player.dy += player.grav;
             player.y += player.dy;
-            if (player.y > 150) { player.y = 150; player.dy = 0; }
-            
-            ctx.clearRect(0, 0, 400, 200);
-            ctx.fillStyle = 'red';
+
+            if (player.y > 150) {
+                player.y = 150;
+                player.dy = 0;
+                player.grounded = true;
+            }
+
+            // رسم اللاعب
+            ctx.fillStyle = "#0095DD";
             ctx.fillRect(player.x, player.y, player.w, player.h);
+
+            // تحريك ورسم العقبات
+            createObstacle();
+            obstacles.forEach((obs, index) => {
+                obs.x -= 5; // سرعة العقبة
+                ctx.fillStyle = "#ff4444";
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+
+                // فحص الاصطدام
+                if (player.x < obs.x + obs.w && player.x + player.w > obs.x &&
+                    player.y < obs.y + obs.h && player.y + player.h > obs.y) {
+                    gameOver();
+                }
+
+                // حذف العقبات التي خرجت من الشاشة وزيادة النقاط
+                if (obs.x + obs.w < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    scoreElement.innerText = score;
+                }
+            });
+
             requestAnimationFrame(update);
         }
 
-        window.onkeydown = (e) => { if(e.code === 'Space' && player.y === 150) player.dy = player.jump; };
+        function gameOver() {
+            gameActive = false;
+            alert("انتهت اللعبة! نقاطك: " + score);
+            location.reload(); // إعادة تشغيل اللعبة
+        }
+
+        // التحكم
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "Space" && player.grounded) {
+                player.dy = player.jump;
+                player.grounded = false;
+            }
+        });
+
         update();
     </script>
 </body>
