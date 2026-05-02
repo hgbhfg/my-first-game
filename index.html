@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>مغامرة الأبطال - نسخة الموسيقى</title>
+    <title>مغامرة الأبطال - طور القتال</title>
     <style>
         body { 
             margin: 0; padding: 0; display: flex; justify-content: center; 
@@ -15,23 +15,23 @@
             background: rgba(15, 23, 42, 0.95); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 10;
         }
-        .menu-title { font-size: 28px; color: #fbbf24; margin-bottom: 15px; }
-        .grid { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .grid { display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; }
         .card {
-            background: #1e293b; border: 2px solid #475569; padding: 8px; border-radius: 8px;
-            cursor: pointer; transition: 0.2s; text-align: center; width: 80px; font-size: 11px;
+            background: #1e293b; border: 2px solid #475569; padding: 10px; border-radius: 8px;
+            cursor: pointer; transition: 0.2s; text-align: center; width: 85px; font-size: 12px;
         }
         .card.selected { border-color: #22c55e; background: #064e3b; }
-        .box { width: 25px; height: 25px; margin: 0 auto 5px; border-radius: 4px; }
+        .box { width: 30px; height: 30px; margin: 0 auto 5px; border-radius: 4px; }
         .btn-primary { 
-            margin-top: 20px; padding: 12px 50px; background: #22c55e; color: white; 
-            border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
+            padding: 12px 50px; background: #22c55e; color: white; 
+            border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 18px;
         }
         #hud {
             position: absolute; top: 10px; left: 15px; right: 15px;
             display: flex; justify-content: space-between; z-index: 5;
-            background: rgba(0,0,0,0.4); padding: 8px 15px; border-radius: 8px; font-size: 14px;
+            background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 8px; font-size: 14px;
         }
+        .ammo-bar { color: #fbbf24; font-weight: bold; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -39,35 +39,32 @@
 
     <div id="game-container">
         <div id="hud">
-            <div id="world-name">العالم: الغابة</div>
+            <div id="status">الذخيرة: <span id="ammo-val" class="ammo-bar">10</span></div>
             <div>النقاط: <span id="current-score">0</span> | المحفظة: <span id="wallet">0</span></div>
         </div>
 
         <div id="main-menu" class="overlay">
-            <h1 class="menu-title">مغامرة الأبطال الصويتة</h1>
+            <h1 style="color: #fbbf24;">مغامرة القتال والأسلحة</h1>
+            <p>اختر بطلك وانطلق (Space للقفز - Enter لإطلاق النار)</p>
             
-            <p>اختر البطل:</p>
             <div class="grid" id="char-grid"></div>
 
             <p>اختر العالم:</p>
             <div class="grid">
-                <div class="card world-card" onclick="selectWorld('forest', '#27ae60', '#87CEEB', 'الغابة', 261)">
+                <div class="card world-card selected" onclick="selectWorld('forest', '#27ae60', '#87CEEB', 'الغابة', 261)">
                     <div class="box" style="background: #27ae60"></div><span>الغابة</span>
                 </div>
                 <div class="card world-card" onclick="selectWorld('desert', '#f1c40f', '#edbd69', 'الصحراء', 440)">
                     <div class="box" style="background: #f1c40f"></div><span>الصحراء</span>
                 </div>
-                <div class="card world-card" onclick="selectWorld('ice', '#ecf0f1', '#a2d9ff', 'الثلوج', 164)">
-                    <div class="box" style="background: #ecf0f1"></div><span>الثلوج</span>
-                </div>
             </div>
 
-            <button class="btn-primary" id="start-btn" onclick="launch()" disabled>انطلاق مع الموسيقى</button>
+            <button class="btn-primary" id="start-btn" onclick="launch()" disabled>ابدأ القتال</button>
         </div>
 
         <div id="end-screen" class="overlay hidden">
-            <h1 id="end-title">تحطمت الشخصية!</h1>
-            <button class="btn-primary" onclick="backToMenu()">العودة للقائمة</button>
+            <h1 id="end-title" style="color:#ef4444;">انتهت المعركة!</h1>
+            <button class="btn-primary" onclick="backToMenu()">العودة للمتجر</button>
         </div>
 
         <canvas id="gameCanvas" width="800" height="400"></canvas>
@@ -76,48 +73,30 @@
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-
-        // نظام الصوت (Audio Engine)
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let musicOsc = null;
 
-        function playSound(freq, type, duration) {
+        function playSound(freq, type, duration, vol=0.1) {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = type;
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
+            if(type === 'sawtooth') osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + duration);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
         }
 
-        function startMusic(freq) {
-            if (musicOsc) musicOsc.stop();
-            musicOsc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            musicOsc.type = 'triangle';
-            musicOsc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-            musicOsc.connect(gain);
-            gain.connect(audioCtx.destination);
-            musicOsc.start();
-        }
-
-        // بيانات اللعبة
         let wallet = 0;
         let isRunning = false;
         let selectedChar = null;
         let worldConfig = { id: 'forest', ground: '#27ae60', sky: '#87CEEB', name: 'الغابة', freq: 261 };
 
         const characters = [
-            { id: 0, name: 'السريع', color: '#2ecc71', price: 0, locked: false },
-            { id: 1, name: 'الذهبي', color: '#f1c40f', price: 20, locked: true }
+            { id: 0, name: 'المقاتل', color: '#2ecc71', price: 0, locked: false },
+            { id: 1, name: 'المدمر', color: '#e74c3c', price: 25, locked: true }
         ];
 
-        let playState = { score: 0, frame: 0, obstacles: [], playerY: 300, dy: 0 };
+        let playState = { score: 0, frame: 0, obstacles: [], bullets: [], playerY: 300, dy: 0, ammo: 10 };
 
         function renderStore() {
             const grid = document.getElementById('char-grid');
@@ -131,7 +110,7 @@
                     document.getElementById('start-btn').disabled = false;
                     renderStore();
                 };
-                card.innerHTML = `<div class="box" style="background:${char.color}"></div><span>${char.name}</span><br><small>${char.locked ? '🔒'+char.price : '✔'}</small>`;
+                card.innerHTML = `<div class="box" style="background:${char.color}"></div><span>${char.name}</span><br><small>${char.locked ? '🔒'+char.price : 'جاهز'}</small>`;
                 grid.appendChild(card);
             });
             document.getElementById('wallet').innerText = wallet;
@@ -147,9 +126,20 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
             document.getElementById('main-menu').classList.add('hidden');
             isRunning = true;
-            playState = { score: 0, frame: 0, obstacles: [], playerY: 300, dy: 0 };
-            startMusic(worldConfig.freq);
+            playState = { score: 0, frame: 0, obstacles: [], bullets: [], playerY: 300, dy: 0, ammo: 10 };
+            document.getElementById('ammo-val').innerText = playState.ammo;
             loop();
+        }
+
+        function shoot() {
+            if (playState.ammo > 0) {
+                playState.bullets.push({ x: 120, y: playState.playerY + 15 });
+                playState.ammo--;
+                document.getElementById('ammo-val').innerText = playState.ammo;
+                playSound(880, 'sine', 0.1, 0.05); // صوت الليزر
+            } else {
+                playSound(100, 'square', 0.1, 0.05); // صوت "لا ذخيرة"
+            }
         }
 
         function loop() {
@@ -162,29 +152,53 @@
             playState.playerY += playState.dy;
             if (playState.playerY > 300) { playState.playerY = 300; playState.dy = 0; }
 
+            // رسم اللاعب
             ctx.fillStyle = selectedChar.color;
             ctx.fillRect(80, playState.playerY, 40, 40);
 
-            if (playState.frame % 80 === 0) playState.obstacles.push({ x: 800 });
+            // تحريك الطلقات
+            ctx.fillStyle = "#fbbf24";
+            for (let b = playState.bullets.length - 1; b >= 0; b--) {
+                playState.bullets[b].x += 15;
+                ctx.fillRect(playState.bullets[b].x, playState.bullets[b].y, 15, 5);
+                if (playState.bullets[b].x > 800) playState.bullets.splice(b, 1);
+            }
+
+            // الوحوش
+            if (playState.frame % 70 === 0) playState.obstacles.push({ x: 800 });
 
             for (let i = playState.obstacles.length - 1; i >= 0; i--) {
-                playState.obstacles[i].x -= 7;
-                ctx.fillStyle = "#c0392b";
-                ctx.fillRect(playState.obstacles[i].x, 300, 40, 40);
+                let obs = playState.obstacles[i];
+                obs.x -= 7;
+                ctx.fillStyle = "#334155";
+                ctx.fillRect(obs.x, 300, 40, 40);
 
-                if (80 < playState.obstacles[i].x + 30 && 120 > playState.obstacles[i].x && playState.playerY > 260) {
+                // تصادم مع اللاعب
+                if (80 < obs.x + 30 && 120 > obs.x && playState.playerY > 260) {
                     isRunning = false;
-                    if (musicOsc) musicOsc.stop();
-                    playSound(150, 'sawtooth', 0.5); // صوت الخسارة
                     wallet += playState.score;
                     document.getElementById('end-screen').classList.remove('hidden');
                 }
 
-                if (playState.obstacles[i].x < -40) {
+                // تصادم مع الطلقات
+                for (let b = playState.bullets.length - 1; b >= 0; b--) {
+                    let bullet = playState.bullets[b];
+                    if (bullet.x > obs.x && bullet.x < obs.x + 40 && bullet.y > 300) {
+                        playState.obstacles.splice(i, 1);
+                        playState.bullets.splice(b, 1);
+                        playState.score += 2; // نقطتان عند التدمير
+                        playState.ammo += 1; // مكافأة ذخيرة
+                        document.getElementById('current-score').innerText = playState.score;
+                        document.getElementById('ammo-val').innerText = playState.ammo;
+                        playSound(200, 'sawtooth', 0.2); // صوت انفجار
+                        break;
+                    }
+                }
+
+                if (obs.x < -40) {
                     playState.obstacles.splice(i, 1);
                     playState.score++;
                     document.getElementById('current-score').innerText = playState.score;
-                    if (playState.score % 5 === 0) playSound(523, 'sine', 0.1); // صوت كل 5 نقاط
                 }
             }
             requestAnimationFrame(loop);
@@ -197,10 +211,12 @@
         }
 
         window.onkeydown = (e) => {
-            if (e.code === "Space" && playState.playerY === 300 && isRunning) {
+            if (!isRunning) return;
+            if (e.code === "Space" && playState.playerY === 300) {
                 playState.dy = -15;
-                playSound(330, 'square', 0.1); // صوت القفزة
+                playSound(300, 'square', 0.1);
             }
+            if (e.code === "Enter") shoot();
         };
 
         renderStore();
